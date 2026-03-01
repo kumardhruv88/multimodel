@@ -1,0 +1,90 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap");
+
+@import "tailwindcss";
+
+@theme {
+  --color-bg-primary: #1a1a1a;
+  --color-bg-secondary: #212121;
+  --color-bg-tertiary: #2a2a2a;
+  --color-bg-hover: #333333;
+  --color-border-default: #3a3a3a;
+  --color-border-focus: #4a4a4a;
+  --color-text-primary: #ececec;
+  --color-text-secondary: #a0a0a0;
+  --color-text-tertiary: #6b6b6b;
+  --color-accent: #cf6679;
+  --color-accent-purple: #7c6cf0;
+  --color-accent-blue: #4a9eff;
+  --color-success: #4ade80;
+  --color-error: #f87171;
+  --color-code-bg: #1e1e2e;
+  --color-user-msg: #2d2d3a;
+
+  --font-sans: "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+@layer base {
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: #212121;
+    color: #ececec;
+    font-family: "Inter", sans-serif;
+    font-size: 14px;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  /* Custom scrollbar styles */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #3a3a3a;
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #4a4a4a;
+  }
+}
+
+@layer utilities {
+  .code-font {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 13px;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .sidebar-width {
+    width: 260px;
+  }
+
+  .chat-max-width {
+    max-width: 760px;
+  }
+}
+
+/* Landing page floating animation */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
