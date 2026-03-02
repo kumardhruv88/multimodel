@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Globe, FileText, Loader2, LogIn, Lock, Info } from "lucide-react";
+import { Globe, FileText, Loader2, LogIn, Lock, Info, Users, Copy, Check, X } from "lucide-react";
 import ChatInput from "@/components/chat/ChatInput/ChatInput";
 import UserMessage from "@/components/chat/Message/UserMessage";
 import AIMessage from "@/components/chat/Message/AIMessage";
@@ -31,7 +31,72 @@ export default function ChatThreadPage() {
   const [showLimitWall, setShowLimitWall] = useState(false);
   const [remaining, setRemaining] = useState(5);
   const [prefill, setPrefill] = useState("");
+  
+  // Share Chat state
+  const [isSharePopoverOpen, setIsSharePopoverOpen] = useState(false);
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const [shareLink, setShareLink] = useState("");
+  const [isGeneratingLink, setIsGeneratingLink] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Close popover on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
+        setIsSharePopoverOpen(false);
+      }
+    }
+    if (isSharePopoverOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isSharePopoverOpen]);
+  
+  const handleStartGroupChat = async () => {
+    let targetThreadId = threadId;
+    // If we're on a new chat, generate a UUID and go to it
+    if (!threadId || threadId === "home" || threadId === "new") {
+      targetThreadId = crypto.randomUUID();
+    }
+    
+    setIsGeneratingLink(true);
+    try {
+      // Call backend to flag thread as shared
+      const res = await fetch(`http://localhost:8000/api/threads/${targetThreadId}/share`, {
+        method: "POST"
+      });
+      if (res.ok) {
+        // Use a cleaner /g/ URL format for sharing
+        const link = `${window.location.origin}/share/${targetThreadId}`;
+        setShareLink(link);
+        setIsSharePopoverOpen(false);
+        setIsLinkModalOpen(true);
+        // Navigate the user to this new generated group chat if they were on a new window
+        if (targetThreadId !== threadId) {
+          router.replace(`/chat/${targetThreadId}`);
+        }
+      } else {
+        console.error("Failed to share thread");
+      }
+    } catch (e) {
+      console.error("Error sharing thread:", e);
+    } finally {
+      setIsGeneratingLink(false);
+    }
+  };
+
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(shareLink);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy", err);
+    }
+  };
 
   // Check auth status
   useEffect(() => {
@@ -334,25 +399,117 @@ export default function ChatThreadPage() {
       backgroundColor: '#212121',
       position: 'relative'
     }}>
-      {/* Top bar with sign-in button */}
-      {!isSignedIn && (
-        <div className="flex items-center justify-between px-4 py-2 border-b border-[#2a2a2a] flex-shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="text-[12px] text-[#6b6b6b]">
-              Free trial: {remaining} prompt{remaining !== 1 ? "s" : ""} left in this thread
-            </span>
-            <span className="text-[11px] text-[#3a3a3a]">|</span>
-            <span className="text-[12px] text-[#6b6b6b]">
-              {getRemainingThreads()} thread{getRemainingThreads() !== 1 ? "s" : ""} left
-            </span>
+      {/* Top bar with sign-in button & Share Button */}
+      <div className="flex items-center justify-between px-4 py-2 border-b border-[#2a2a2a] flex-shrink-0">
+        <div className="flex items-center gap-2">
+          {!isSignedIn && (
+            <>
+              <span className="text-[12px] text-[#6b6b6b]">
+                Free trial: {remaining} prompt{remaining !== 1 ? "s" : ""} left in this thread
+              </span>
+              <span className="text-[11px] text-[#3a3a3a]">|</span>
+              <span className="text-[12px] text-[#6b6b6b]">
+                {getRemainingThreads()} thread{getRemainingThreads() !== 1 ? "s" : ""} left
+              </span>
+            </>
+          )}
+        </div>
+        
+        <div className="flex items-center gap-3 relative">
+          <div ref={popoverRef} className="relative">
+            <button
+              onClick={() => setIsSharePopoverOpen(!isSharePopoverOpen)}
+              className="w-8 h-8 rounded-full flex items-center justify-center text-[#a0a0a0] hover:text-[#ececec] hover:bg-[#333333] transition-colors"
+              title="Share Chat"
+            >
+              <Users size={18} />
+            </button>
+
+                {isSharePopoverOpen && (
+                  <div className="absolute top-10 right-0 w-[320px] bg-[#212121] border border-[#3a3a3a] rounded-[18px] shadow-2xl z-50 overflow-hidden transform origin-top-right transition-all animate-in fade-in slide-in-from-top-2">
+                    <div className="p-5 pb-4">
+                      <h3 className="text-[16px] font-semibold text-white mb-1.5">Use NEXUS AI together</h3>
+                      <p className="text-[14px] text-[#a0a0a0] leading-[1.4]">
+                        Add people to your chats to plan, share ideas, and get creative.
+                      </p>
+                    </div>
+                    <div className="p-4 pt-1 flex items-center justify-end gap-2">
+                      <button 
+                        onClick={() => setIsSharePopoverOpen(false)}
+                        className="px-4 py-2.5 text-[14px] font-medium text-[#ececec] hover:bg-[#333333] rounded-full transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        onClick={handleStartGroupChat}
+                        disabled={isGeneratingLink}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-white hover:bg-gray-100 text-black text-[14px] font-medium rounded-full transition-colors disabled:opacity-50"
+                      >
+                        {isGeneratingLink && <Loader2 size={14} className="animate-spin" />}
+                        Start group chat
+                      </button>
+                    </div>
+                  </div>
+                )}
           </div>
-          <button
-            onClick={() => router.push("/sign-in")}
-            className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#cf6679] hover:bg-[#b85768] text-white text-[12px] font-medium transition-all hover:shadow-lg hover:shadow-[#cf6679]/20"
-          >
-            <LogIn size={12} />
-            Sign in for unlimited
-          </button>
+
+          {!isSignedIn && (
+            <button
+              onClick={() => router.push("/sign-in")}
+              className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#cf6679] hover:bg-[#b85768] text-white text-[12px] font-medium transition-all hover:shadow-lg hover:shadow-[#cf6679]/20"
+            >
+              <LogIn size={12} />
+              Sign in for unlimited
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Share Link Modal */}
+      {isLinkModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md bg-[#2a2a2a] border border-[#3a3a3a] rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between p-4 border-b border-[#3a3a3a]">
+              <h2 className="text-[16px] font-semibold text-[#ececec]">Group link</h2>
+              <button 
+                onClick={() => setIsLinkModalOpen(false)}
+                className="text-[#a0a0a0] hover:text-[#ececec] transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-5">
+              <div className="flex items-center gap-2 pb-1 bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg p-3 mb-4">
+                <input 
+                  type="text" 
+                  value={shareLink} 
+                  readOnly 
+                  className="flex-1 bg-transparent border-none text-[13px] text-[#ececec] focus:outline-none selection:bg-[#cf6679]/30"
+                />
+              </div>
+              
+              <p className="text-[13px] text-[#a0a0a0] leading-relaxed mb-6">
+                Use a group link to invite others to join your group chat. Anyone can join your group chat with this link, and they&apos;ll be able to see the previous messages in this group chat.
+              </p>
+              
+              <div className="flex items-center justify-end gap-3">
+                <button 
+                  onClick={() => setIsLinkModalOpen(false)}
+                  className="px-5 py-2.5 rounded-full text-[14px] font-medium text-[#ececec] hover:bg-[#333333] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={copyToClipboard}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white hover:bg-gray-100 text-black text-[14px] font-medium transition-colors"
+                >
+                  {isCopied ? <Check size={16} /> : <Copy size={16} />}
+                  {isCopied ? "Copied!" : "Copy link"}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

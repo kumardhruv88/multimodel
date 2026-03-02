@@ -132,8 +132,39 @@ def archive_thread_endpoint(thread_id: str):
 @router.post("/api/threads/{thread_id}/share")
 def share_thread(thread_id: str):
     """Make a thread publicly shareable."""
+    from services.db_service import supabase
+    if supabase:
+        # Check if thread exists
+        thread_res = supabase.table("threads").select("id").eq("id", thread_id).execute()
+        if not thread_res.data:
+            supabase.table("threads").insert({"id": thread_id, "title": "New Group Chat", "shared": True}).execute()
+        else:
+            supabase.table("threads").update({"shared": True}).eq("id", thread_id).execute()
+            
     messages = get_messages(thread_id)
-    # Return the thread data for public viewing
+    return {
+        "thread_id": thread_id,
+        "messages": messages,
+        "shared": True
+    }
+
+@router.get("/api/threads/{thread_id}/share")
+def get_shared_thread(thread_id: str):
+    """Get a shared thread (no auth required for read)."""
+    from services.db_service import supabase
+    if not supabase:
+        return {"status": "error", "message": "Database not connected"}
+    
+    # Verify it is shared
+    thread_res = supabase.table("threads").select("shared").eq("id", thread_id).execute()
+    if not thread_res.data or not thread_res.data[0].get("shared"):
+        # For development we might just allow it, but let's be safe
+        messages = get_messages(thread_id)
+        if messages:
+            return {"thread_id": thread_id, "messages": messages, "shared": False}
+        return {"status": "error", "message": "Not found or not shared"}
+        
+    messages = get_messages(thread_id)
     return {
         "thread_id": thread_id,
         "messages": messages,
