@@ -2,7 +2,6 @@
 
 <img src="https://img.shields.io/badge/NEXUS-AI-cf6679?style=for-the-badge&labelColor=1a1a1a&color=cf6679" alt="NEXUS AI" width="200"/>
 
-# NEXUS AI
 
 ### A Claude.ai-inspired multimodal AI assistant platform
 
