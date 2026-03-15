@@ -40,7 +40,7 @@ export default function SearchModal({ isOpen, onClose }: { isOpen: boolean; onCl
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       try {
-        const res = await fetch(`http://localhost:8000/api/threads/search?q=${encodeURIComponent(query)}`);
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/threads/search?q=${encodeURIComponent(query)}`);
         const data = await res.json();
         setResults(Array.isArray(data) ? data : []);
         setSelectedIndex(0);

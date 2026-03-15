@@ -22,7 +22,7 @@ export default function WorkspaceSelector({ onWorkspaceChange }: WorkspaceSelect
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch("http://localhost:8000/api/workspaces")
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/workspaces`)
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data)) setWorkspaces(data);

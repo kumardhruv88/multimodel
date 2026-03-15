@@ -43,7 +43,7 @@ function MemoryTab() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("http://localhost:8000/api/memories")
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/memories`)
       .then((r) => r.json())
       .then((data) => { if (Array.isArray(data)) setMemories(data); })
       .catch(() => {})
@@ -53,7 +53,7 @@ function MemoryTab() {
   const addMemory = async () => {
     if (!newContent.trim()) return;
     try {
-      const res = await fetch("http://localhost:8000/api/memories", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/memories`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: newContent.trim(), category: newCategory }),
@@ -66,7 +66,7 @@ function MemoryTab() {
 
   const deleteMemory = async (id: string) => {
     try {
-      await fetch(`http://localhost:8000/api/memories/${id}`, { method: "DELETE" });
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/memories/${id}`, { method: "DELETE" });
       setMemories((prev) => prev.filter((m) => m.id !== id));
     } catch {}
   };

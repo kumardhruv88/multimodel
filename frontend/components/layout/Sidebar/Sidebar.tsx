@@ -100,7 +100,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         setThreads([]);
         return;
       }
-      fetch("http://localhost:8000/api/threads")
+      fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/threads`)
         .then((r) => r.json())
         .then((data) => {
           if (Array.isArray(data)) setThreads(data);
@@ -150,7 +150,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const handleDelete = async (threadId: string) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/threads/${threadId}`, { method: "DELETE" });
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/threads/${threadId}`, { method: "DELETE" });
       if (res.ok) {
         setThreads((prev) => prev.filter((t) => t.id !== threadId));
         if (pathname === `/chat/${threadId}`) router.push("/chat/home");
@@ -166,7 +166,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       return;
     }
     try {
-      await fetch(`http://localhost:8000/api/threads/${threadId}/rename`, {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/threads/${threadId}/rename`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: renameValue.trim() }),
@@ -182,7 +182,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const handlePin = async (threadId: string, pinned: boolean) => {
     try {
-      await fetch(`http://localhost:8000/api/threads/${threadId}/pin`, {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/threads/${threadId}/pin`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pinned }),
@@ -197,7 +197,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const handleExport = async (threadId: string) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/threads/${threadId}/export?format=md`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/threads/${threadId}/export?format=md`);
       const data = await res.json();
       const blob = new Blob([data.content], { type: "text/markdown" });
       const url = URL.createObjectURL(blob);

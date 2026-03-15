@@ -65,7 +65,7 @@ export default function ChatThreadPage() {
     setIsGeneratingLink(true);
     try {
       // Call backend to flag thread as shared
-      const res = await fetch(`http://localhost:8000/api/threads/${targetThreadId}/share`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/threads/${targetThreadId}/share`, {
         method: "POST"
       });
       if (res.ok) {
@@ -137,7 +137,7 @@ export default function ChatThreadPage() {
       return;
     }
 
-    fetch(`http://localhost:8000/api/threads/${threadId}/messages`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/threads/${threadId}/messages`)
       .then(r => r.json())
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
@@ -196,7 +196,7 @@ export default function ChatThreadPage() {
         const formData = new FormData();
         formData.append('file', file);
         try {
-          await fetch('http://localhost:8000/api/documents/upload', {
+          await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/documents/upload`, {
             method: 'POST', body: formData
           });
         } catch (e) {
@@ -257,7 +257,7 @@ export default function ChatThreadPage() {
 
     try {
       if (options.imageGen) {
-        const res = await fetch('http://localhost:8000/api/images/generate', {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/images/generate`, {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({ prompt: content })
@@ -283,7 +283,7 @@ export default function ChatThreadPage() {
         // NORMAL CHAT FLOW
         const model = localStorage.getItem("nexus_model") || "llama-3.3-70b-versatile";
         
-        const response = await fetch("http://localhost:8000/api/chat", {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

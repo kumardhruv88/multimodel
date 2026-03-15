@@ -30,7 +30,7 @@ export default function ArtifactsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("http://localhost:8000/api/artifacts")
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/artifacts`)
       .then(r => r.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -44,7 +44,7 @@ export default function ArtifactsPage() {
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      const res = await fetch(`http://localhost:8000/api/artifacts/${id}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/artifacts/${id}`, {
         method: "DELETE"
       });
       if (res.ok) {

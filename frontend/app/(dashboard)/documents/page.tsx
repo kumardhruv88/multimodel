@@ -27,7 +27,7 @@ export default function DocumentsPage() {
 
   // Fetch documents on mount
   useEffect(() => {
-    fetch("http://localhost:8000/api/documents")
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/documents`)
       .then(r => r.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -45,7 +45,7 @@ export default function DocumentsPage() {
     formData.append('file', file);
 
     try {
-      const res = await fetch('http://localhost:8000/api/documents/upload', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/documents/upload`, {
         method: 'POST',
         body: formData
       });
@@ -85,7 +85,7 @@ export default function DocumentsPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/documents/${id}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/documents/${id}`, {
         method: 'DELETE'
       });
       if (res.ok) {

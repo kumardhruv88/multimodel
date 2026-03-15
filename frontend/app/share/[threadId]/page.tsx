@@ -23,7 +23,7 @@ export default function SharedThread() {
 
   useEffect(() => {
     if (!threadId) return;
-    fetch(`http://localhost:8000/api/threads/${threadId}/share`, { method: "GET" })
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/threads/${threadId}/share`, { method: "GET" })
       .then(async (r) => {
         if (!r.ok) throw new Error("Not available");
         return r.json();

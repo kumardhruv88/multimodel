@@ -21,7 +21,7 @@ export default function WorkspacesPage() {
 
   // Fetch workspaces on mount
   useEffect(() => {
-    fetch("http://localhost:8000/api/workspaces")
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/workspaces`)
       .then(r => r.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -34,7 +34,7 @@ export default function WorkspacesPage() {
   const handleCreate = async () => {
     if (!name.trim()) return
     try {
-      const res = await fetch("http://localhost:8000/api/workspaces", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/workspaces`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, description, icon })
@@ -54,7 +54,7 @@ export default function WorkspacesPage() {
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      const res = await fetch(`http://localhost:8000/api/workspaces/${id}`, { 
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/workspaces/${id}`, { 
         method: "DELETE" 
       });
       if (res.ok) {
