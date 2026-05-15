@@ -1,5 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import { SignOutButton, useAuth } from "@clerk/nextjs";
+import { getEffectiveUserId } from "@/lib/userSession";
 import {
   Cpu,
   Volume2,
@@ -41,21 +43,29 @@ function MemoryTab() {
   const [newContent, setNewContent] = useState("");
   const [newCategory, setNewCategory] = useState("general");
   const [loading, setLoading] = useState(true);
+  const { userId: clerkUserId } = useAuth();
+  const effectiveUserId = typeof window !== 'undefined' ? getEffectiveUserId(clerkUserId) : null;
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/memories`)
+    if (!effectiveUserId) return;
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/memories`, {
+      headers: { "X-User-ID": effectiveUserId }
+    })
       .then((r) => r.json())
       .then((data) => { if (Array.isArray(data)) setMemories(data); })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [effectiveUserId]);
 
   const addMemory = async () => {
     if (!newContent.trim()) return;
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/memories`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(effectiveUserId ? { "X-User-ID": effectiveUserId } : {})
+        },
         body: JSON.stringify({ content: newContent.trim(), category: newCategory }),
       });
       const data = await res.json();
@@ -66,7 +76,10 @@ function MemoryTab() {
 
   const deleteMemory = async (id: string) => {
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/memories/${id}`, { method: "DELETE" });
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/memories/${id}`, { 
+        method: "DELETE",
+        headers: effectiveUserId ? { "X-User-ID": effectiveUserId } : undefined
+      });
       setMemories((prev) => prev.filter((m) => m.id !== id));
     } catch {}
   };
@@ -404,9 +417,15 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* Save Button (for AI and Voice tabs) */}
-      {(activeTab === "ai" || activeTab === "voice") && (
-        <div className="flex justify-end mt-8">
+      {/* Bottom Actions Area */}
+      <div className="flex items-center justify-between mt-8 pt-6 border-t border-[#2a2a2a]">
+        <SignOutButton redirectUrl="/">
+          <button className="px-4 py-2 rounded-lg text-sm font-medium text-[#cf6679] hover:bg-[#cf6679]/10 transition-all border border-transparent hover:border-[#cf6679]/20">
+            Log Out
+          </button>
+        </SignOutButton>
+
+        {(activeTab === "ai" || activeTab === "voice") && (
           <button
             onClick={handleSave}
             className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
@@ -424,8 +443,8 @@ export default function SettingsPage() {
               "Save Changes"
             )}
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

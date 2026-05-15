@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
 import { motion, AnimatePresence } from "framer-motion";
+import { getEffectiveUserId } from "@/lib/userSession";
 import { v4 as uuidv4 } from "uuid";
 import SearchModal from "@/components/SearchModal";
 import WorkspaceSelector from "@/components/WorkspaceSelector";
@@ -91,6 +93,13 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [renameValue, setRenameValue] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const renameInputRef = useRef<HTMLInputElement>(null);
+  const { userId: clerkUserId } = useAuth();
+  const [effectiveUserId, setEffectiveUserId] = React.useState<string>("anon_loading");
+
+  // Resolve the effective user ID (Clerk or anonymous session)
+  React.useEffect(() => {
+    setEffectiveUserId(getEffectiveUserId(clerkUserId));
+  }, [clerkUserId]);
 
   useEffect(() => {
     const fetchThreads = () => {
@@ -100,7 +109,9 @@ const Sidebar: React.FC<SidebarProps> = ({
         setThreads([]);
         return;
       }
-      fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/threads`)
+      fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/threads`, {
+        headers: { "X-User-ID": effectiveUserId }
+      })
         .then((r) => r.json())
         .then((data) => {
           if (Array.isArray(data)) setThreads(data);
@@ -111,7 +122,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     fetchThreads();
     window.addEventListener("nexus-thread-updated", fetchThreads);
     return () => window.removeEventListener("nexus-thread-updated", fetchThreads);
-  }, []);
+  }, [effectiveUserId]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -150,7 +161,10 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const handleDelete = async (threadId: string) => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/threads/${threadId}`, { method: "DELETE" });
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/threads/${threadId}`, { 
+        method: "DELETE",
+        headers: { "X-User-ID": effectiveUserId }
+      });
       if (res.ok) {
         setThreads((prev) => prev.filter((t) => t.id !== threadId));
         if (pathname === `/chat/${threadId}`) router.push("/chat/home");
@@ -168,7 +182,10 @@ const Sidebar: React.FC<SidebarProps> = ({
     try {
       await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/threads/${threadId}/rename`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "X-User-ID": effectiveUserId
+        },
         body: JSON.stringify({ title: renameValue.trim() }),
       });
       setThreads((prev) =>
@@ -184,7 +201,10 @@ const Sidebar: React.FC<SidebarProps> = ({
     try {
       await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/threads/${threadId}/pin`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "X-User-ID": effectiveUserId
+        },
         body: JSON.stringify({ pinned }),
       });
       setThreads((prev) =>
@@ -197,7 +217,9 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const handleExport = async (threadId: string) => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/threads/${threadId}/export?format=md`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/threads/${threadId}/export?format=md`, {
+        headers: { "X-User-ID": effectiveUserId }
+      });
       const data = await res.json();
       const blob = new Blob([data.content], { type: "text/markdown" });
       const url = URL.createObjectURL(blob);

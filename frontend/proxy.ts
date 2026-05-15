@@ -10,6 +10,8 @@ const isPublicRoute = createRouteMatcher([
   "/documents(.*)",
   "/artifacts(.*)",
   "/settings(.*)",
+  // Public assets
+  "/intro.mp4",
 ]);
 
 export default clerkMiddleware(async (auth, request) => {
@@ -20,7 +22,8 @@ export default clerkMiddleware(async (auth, request) => {
 
 export const config = {
   matcher: [
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    // Skip Next.js internals and all static files (including video files)
+    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest|mp4|webm)).*)",
     "/(api|trpc)(.*)",
   ],
 };

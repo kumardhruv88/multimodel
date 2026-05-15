@@ -1,5 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import { useAuth } from "@clerk/nextjs";
+import { getEffectiveUserId } from "@/lib/userSession";
 import { Plus, Trash2 } from "lucide-react";
 
 interface Workspace {
@@ -16,12 +18,21 @@ export default function WorkspacesPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [icon, setIcon] = useState("🗂️");
+  const { userId: clerkUserId } = useAuth();
+  const [effectiveUserId, setEffectiveUserId] = React.useState<string>("anon_loading");
+
+  useEffect(() => {
+    setEffectiveUserId(getEffectiveUserId(clerkUserId));
+  }, [clerkUserId]);
 
   const icons = ["🗂️","💼","🚀","🎨","📚","🔬","💡","🎯"]
 
   // Fetch workspaces on mount
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/workspaces`)
+    if (effectiveUserId === "anon_loading") return;
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/workspaces`, {
+      headers: { "X-User-ID": effectiveUserId }
+    })
       .then(r => r.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -29,14 +40,17 @@ export default function WorkspacesPage() {
         }
       })
       .catch(console.error)
-  }, [])
+  }, [effectiveUserId])
 
   const handleCreate = async () => {
     if (!name.trim()) return
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/workspaces`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "X-User-ID": effectiveUserId
+        },
         body: JSON.stringify({ name, description, icon })
       })
       if (res.ok) {
@@ -55,7 +69,8 @@ export default function WorkspacesPage() {
     e.stopPropagation();
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/workspaces/${id}`, { 
-        method: "DELETE" 
+        method: "DELETE",
+        headers: { "X-User-ID": effectiveUserId }
       });
       if (res.ok) {
         setWorkspaces(prev => prev.filter(w => w.id !== id))

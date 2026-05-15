@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { useAuth } from "@clerk/nextjs";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, FolderOpen, Plus, Check } from "lucide-react";
+import { getEffectiveUserId } from "@/lib/userSession";
 
 interface Workspace {
   id: string;
@@ -20,15 +22,24 @@ export default function WorkspaceSelector({ onWorkspaceChange }: WorkspaceSelect
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const { userId: clerkUserId } = useAuth();
+  const [effectiveUserId, setEffectiveUserId] = React.useState<string>("anon_loading");
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/workspaces`)
+    setEffectiveUserId(getEffectiveUserId(clerkUserId));
+  }, [clerkUserId]);
+
+  useEffect(() => {
+    if (effectiveUserId === "anon_loading") return;
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/workspaces`, {
+      headers: { "X-User-ID": effectiveUserId }
+    })
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data)) setWorkspaces(data);
       })
       .catch(() => {});
-  }, []);
+  }, [effectiveUserId]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {

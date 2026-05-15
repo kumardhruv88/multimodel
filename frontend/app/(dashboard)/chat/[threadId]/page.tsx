@@ -1,6 +1,8 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
+import { getEffectiveUserId } from "@/lib/userSession";
 import { Globe, FileText, Loader2, LogIn, Lock, Info, Users, Copy, Check, X } from "lucide-react";
 import ChatInput from "@/components/chat/ChatInput/ChatInput";
 import UserMessage from "@/components/chat/Message/UserMessage";
@@ -20,7 +22,14 @@ interface Message {
 export default function ChatThreadPage() {
   const params = useParams();
   const router = useRouter();
+  const { userId: clerkUserId } = useAuth();
+  const [effectiveUserId, setEffectiveUserId] = React.useState<string>("anon_loading");
   const threadId = params.threadId as string;
+  
+  // Resolve effective user ID on mount and when clerk user changes
+  useEffect(() => {
+    setEffectiveUserId(getEffectiveUserId(clerkUserId));
+  }, [clerkUserId]);
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [history, setHistory] = useState<{role: string, content: string}[]>([]);
@@ -66,7 +75,8 @@ export default function ChatThreadPage() {
     try {
       // Call backend to flag thread as shared
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/threads/${targetThreadId}/share`, {
-        method: "POST"
+        method: "POST",
+        headers: { "X-User-ID": effectiveUserId }
       });
       if (res.ok) {
         // Use a cleaner /g/ URL format for sharing
@@ -137,7 +147,9 @@ export default function ChatThreadPage() {
       return;
     }
 
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/threads/${threadId}/messages`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/threads/${threadId}/messages`, {
+      headers: { "X-User-ID": effectiveUserId }
+    })
       .then(r => r.json())
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
@@ -155,7 +167,7 @@ export default function ChatThreadPage() {
         }
       })
       .catch(err => console.error("Failed to load chat history:", err));
-  }, [threadId, isSignedIn]);
+  }, [threadId, effectiveUserId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -257,14 +269,26 @@ export default function ChatThreadPage() {
 
     try {
       if (options.imageGen) {
+        setStatusText("✨ Generating image with FLUX.1-schnell...");
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/images/generate`, {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ prompt: content })
+          headers: {
+            'Content-Type': 'application/json',
+            "X-User-ID": effectiveUserId
+          },
+          body: JSON.stringify({ 
+            prompt: content,
+            thread_id: threadId
+          })
         });
         const data = await res.json();
         
-        if (data.image_url) {
+        if (res.status === 503) {
+          // Model is warming up
+          setMessages(prev => prev.map(msg => 
+            msg.id === aiId ? { ...msg, content: `⏳ ${data.error}\n\nTry sending the message again in a few seconds.` } : msg
+          ));
+        } else if (data.image_url) {
           const imageContent = `[NEXUS_IMAGE:${data.image_url}]\n\n*"${content}"*`;
           setMessages(prev => prev.map(msg => 
             msg.id === aiId ? { ...msg, content: imageContent } : msg
@@ -272,7 +296,7 @@ export default function ChatThreadPage() {
           setHistory(prev => [
             ...prev, 
             { role: "user", content },
-            { role: "assistant", content: `(Generated Image: ${data.image_url})` }
+            { role: "assistant", content: `(Generated Image for: "${content}")` }
           ]);
         } else {
           throw new Error(data.error || "Failed to generate image");
@@ -285,7 +309,10 @@ export default function ChatThreadPage() {
         
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/chat`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "X-User-ID": effectiveUserId
+          },
           body: JSON.stringify({
             message: content,
             thread_id: threadId,

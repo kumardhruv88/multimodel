@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
   FileText,
@@ -97,9 +97,14 @@ const fadeUp = {
 
 export default function LandingPage() {
   const router = useRouter();
-
   return (
     <div className="min-h-screen bg-[#0d0d0d] text-white overflow-x-hidden">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1, ease: "easeOut" }}
+          className="relative w-full min-h-screen"
+        >
       {/* ===== NAVBAR ===== */}
       <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 md:px-10 h-16 bg-[#0d0d0d]/80 backdrop-blur-xl border-b border-white/[0.06]">
         <a href="/" className="flex items-center gap-2.5">
@@ -344,6 +349,7 @@ export default function LandingPage() {
           </a>
         </div>
       </footer>
+        </motion.div>
     </div>
   );
 }
