@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth, useUser } from "@clerk/nextjs";
 import { motion, AnimatePresence } from "framer-motion";
 import { getEffectiveUserId } from "@/lib/userSession";
 import { v4 as uuidv4 } from "uuid";
@@ -94,6 +94,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [searchOpen, setSearchOpen] = useState(false);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const { userId: clerkUserId } = useAuth();
+  const { user, isLoaded: userLoaded } = useUser();
   const [effectiveUserId, setEffectiveUserId] = React.useState<string>("anon_loading");
 
   // Resolve the effective user ID (Clerk or anonymous session)
@@ -104,8 +105,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   useEffect(() => {
     const fetchThreads = () => {
       // Only load chat history for signed-in users
-      const isSignedIn = document.cookie.includes("__clerk") || document.cookie.includes("__session");
-      if (!isSignedIn) {
+      if (!clerkUserId) {
         setThreads([]);
         return;
       }
@@ -239,7 +239,8 @@ const Sidebar: React.FC<SidebarProps> = ({
     setContextMenu({ threadId, x: e.clientX, y: e.clientY });
   };
 
-  const user = { firstName: "Dhruv", imageUrl: null as string | null };
+  const displayName = user?.firstName || (clerkUserId ? "User" : "Guest");
+  const userImageUrl = user?.imageUrl || null;
 
   const navItems = [
     { icon: Search, label: "Search", onClick: () => setSearchOpen(true) },
@@ -390,16 +391,16 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div onClick={() => router.push("/settings")}
           className={`flex items-center rounded-lg hover:bg-[#333333] cursor-pointer transition-all duration-150 group ${isCollapsed ? "w-9 h-9 justify-center" : "gap-2 h-10 px-2"}`}
         >
-          {user?.imageUrl ? (
-            <img src={user.imageUrl} alt={user.firstName || "User"} className="w-[26px] h-[26px] rounded-full object-cover" />
+          {userImageUrl ? (
+            <img src={userImageUrl} alt={displayName} className="w-[26px] h-[26px] rounded-full object-cover" />
           ) : (
             <div className="w-[26px] h-[26px] rounded-full bg-[#cf6679] flex items-center justify-center shrink-0">
-              <span className="text-white text-[10px] font-bold uppercase">{user?.firstName?.charAt(0) || "U"}</span>
+              <span className="text-white text-[10px] font-bold uppercase">{displayName.charAt(0)}</span>
             </div>
           )}
           {!isCollapsed && (
             <>
-              <span className="text-sm text-[#ececec] font-medium truncate flex-1">{user?.firstName || "Settings"}</span>
+              <span className="text-sm text-[#ececec] font-medium truncate flex-1">{displayName}</span>
               <Settings size={14} className="text-[#6b6b6b] group-hover:text-[#a0a0a0]" />
             </>
           )}

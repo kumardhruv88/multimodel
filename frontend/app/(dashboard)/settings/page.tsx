@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { SignOutButton, useAuth } from "@clerk/nextjs";
+import { useAuth, useClerk } from "@clerk/nextjs";
 import { getEffectiveUserId } from "@/lib/userSession";
 import {
   Cpu,
@@ -180,7 +180,9 @@ function MemoryTab() {
 }
 
 export default function SettingsPage() {
+  const { signOut } = useClerk();
   const [activeTab, setActiveTab] = useState("ai");
+
   const [model, setModel] = useState("llama-3.3-70b-versatile");
   const [ttsEnabled, setTtsEnabled] = useState(false);
   const [webSearchDefault, setWebSearchDefault] = useState(false);
@@ -419,11 +421,13 @@ export default function SettingsPage() {
 
       {/* Bottom Actions Area */}
       <div className="flex items-center justify-between mt-8 pt-6 border-t border-[#2a2a2a]">
-        <SignOutButton redirectUrl="/">
-          <button className="px-4 py-2 rounded-lg text-sm font-medium text-[#cf6679] hover:bg-[#cf6679]/10 transition-all border border-transparent hover:border-[#cf6679]/20">
-            Log Out
-          </button>
-        </SignOutButton>
+        <button 
+          onClick={() => signOut({ redirectUrl: "/" })}
+          className="px-4 py-2 rounded-lg text-sm font-medium text-[#cf6679] hover:bg-[#cf6679]/10 transition-all border border-transparent hover:border-[#cf6679]/20"
+        >
+          Log Out
+        </button>
+
 
         {(activeTab === "ai" || activeTab === "voice") && (
           <button

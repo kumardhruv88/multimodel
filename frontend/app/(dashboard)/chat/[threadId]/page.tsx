@@ -472,7 +472,7 @@ export default function ChatThreadPage() {
           {!clerkUserId && (
             <button
               onClick={() => router.push("/sign-in")}
-              className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#cf6679] hover:bg-[#b85768] text-white text-[12px] font-medium transition-all hover:shadow-lg hover:shadow-[#cf6679]/20"
+              className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-white hover:bg-[#ececec] text-black text-[12px] font-semibold transition-all hover:shadow-lg hover:shadow-white/10"
             >
               <LogIn size={12} />
               Sign in for unlimited
