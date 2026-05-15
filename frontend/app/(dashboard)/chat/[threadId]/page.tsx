@@ -36,7 +36,6 @@ export default function ChatThreadPage() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [statusText, setStatusText] = useState("");
   const [ttsEnabled, setTtsEnabled] = useState(false);
-  const [isSignedIn, setIsSignedIn] = useState(false);
   const [showLimitWall, setShowLimitWall] = useState(false);
   const [remaining, setRemaining] = useState(5);
   const [prefill, setPrefill] = useState("");
@@ -108,16 +107,6 @@ export default function ChatThreadPage() {
     }
   };
 
-  // Check auth status
-  useEffect(() => {
-    try {
-      // Simple check - if Clerk user cookie exists
-      const hasAuth = document.cookie.includes("__clerk") || document.cookie.includes("__session");
-      setIsSignedIn(hasAuth);
-    } catch {
-      setIsSignedIn(false);
-    }
-  }, []);
 
   // Load TTS preference
   useEffect(() => {
@@ -127,10 +116,10 @@ export default function ChatThreadPage() {
 
   // Update remaining count
   useEffect(() => {
-    if (!isSignedIn) {
+    if (!clerkUserId) {
       setRemaining(getRemainingPrompts(threadId));
     }
-  }, [threadId, isSignedIn, messages.length]);
+  }, [threadId, clerkUserId, messages.length]);
 
   // Load existing messages
   useEffect(() => {
@@ -141,7 +130,7 @@ export default function ChatThreadPage() {
     
     if (!threadId || threadId === "home") {
       // Check if can create new threads
-      if (!isSignedIn && !canCreateThread()) {
+      if (!clerkUserId && !canCreateThread()) {
         setShowLimitWall(true);
       }
       return;
@@ -175,7 +164,7 @@ export default function ChatThreadPage() {
 
   const handleSend = async (content: string, options: any = {}) => {
     // FREE TRIAL CHECK (skip for signed-in users)
-    if (!isSignedIn) {
+    if (!clerkUserId) {
       if (!canSendPrompt(threadId)) {
         setShowLimitWall(true);
         return;
@@ -232,7 +221,7 @@ export default function ChatThreadPage() {
     }
 
     // Record usage for free users
-    if (!isSignedIn) {
+    if (!clerkUserId) {
       recordPrompt(threadId);
       setRemaining(getRemainingPrompts(threadId));
     }
@@ -429,7 +418,7 @@ export default function ChatThreadPage() {
       {/* Top bar with sign-in button & Share Button */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-[#2a2a2a] flex-shrink-0">
         <div className="flex items-center gap-2">
-          {!isSignedIn && (
+          {!clerkUserId && (
             <>
               <span className="text-[12px] text-[#6b6b6b]">
                 Free trial: {remaining} prompt{remaining !== 1 ? "s" : ""} left in this thread
@@ -480,7 +469,7 @@ export default function ChatThreadPage() {
                 )}
           </div>
 
-          {!isSignedIn && (
+          {!clerkUserId && (
             <button
               onClick={() => router.push("/sign-in")}
               className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#cf6679] hover:bg-[#b85768] text-white text-[12px] font-medium transition-all hover:shadow-lg hover:shadow-[#cf6679]/20"
@@ -594,7 +583,7 @@ export default function ChatThreadPage() {
               Ask anything, upload documents, or search the web.
             </p>
             <PromptTemplates onSelect={(prompt) => setPrefill(prompt + "__" + Date.now())} />
-            {!isSignedIn && (
+            {!clerkUserId && (
               <p className="mt-6 text-[11px] text-[#6b6b6b]">
                 <Info size={10} className="inline mr-1" />
                 5 free threads · 5 prompts each · Sign in for unlimited
