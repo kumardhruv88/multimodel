@@ -18,8 +18,10 @@ load_dotenv()
 
 router = APIRouter()
 
-# Initialize Groq client
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+# Initialize Groq client safely
+groq_api_key = os.getenv("GROQ_API_KEY")
+client = Groq(api_key=groq_api_key) if groq_api_key else None
+
 
 class ChatRequest(BaseModel):
     message: str
@@ -31,6 +33,8 @@ class ChatRequest(BaseModel):
     image_data: str = ""  # base64 encoded image for vision
 
 async def generate_title(message: str) -> str:
+    if not client:
+        return "New Chat"
     try:
         response = client.chat.completions.create(
             model="llama-3.1-8b-instant",
@@ -56,14 +60,24 @@ async def chat_stream_generator(request: ChatRequest, user_id: str | None = None
     Generator that yields SSE events for each token from Groq.
     Sends structured events: token, status, sources, done.
     """
+    if not client:
+        yield f"data: {json.dumps({'type': 'error', 'content': 'GROQ_API_KEY is not configured in the backend environment. Please set it to enable chat features.'})}\n\n"
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+        return
+
     try:
         today = datetime.now().strftime("%B %d, %Y %I:%M %p")
         
         system_prompt = (
             "You are NEXUS, a helpful, knowledgeable, and articulate AI assistant. "
-            "Format responses using Markdown where appropriate (headers, bullets, code blocks with language tags). "
-            "Be concise but thorough. Acknowledge uncertainty rather than hallucinating. "
-            "Always cite sources when using web search or document retrieval. "
+            "Follow these strict formatting guidelines:\n"
+            "- Use Markdown for all formatting.\n"
+            "- For any code, ALWAYS use a fenced code block with the correct language tag (e.g. ```python, ```javascript).\n"
+            "- For flowcharts, sequence diagrams, or state diagrams, ALWAYS use mermaid.js syntax inside a ```mermaid block.\n"
+            "- For math and STEM formulas, use $ for inline math and $$ for display math (KaTeX format).\n"
+            "- When explaining complex topics, use tables and bulleted lists to structure the output.\n"
+            "- If a user asks a complex reasoning or calculation question, use <think> tags to show your step-by-step reasoning process before giving the final answer. E.g. <think>Step 1... Step 2...</think> Final Answer.\n"
+            "Acknowledge uncertainty rather than hallucinating. Always cite sources when using web search or document retrieval. "
             f"Current date and time: {today}. "
         )
 
@@ -117,6 +131,8 @@ async def chat_stream_generator(request: ChatRequest, user_id: str | None = None
             
         # Add current user message (with optional image for vision)
         full_response = ""
+        token_count = 0
+        
         if request.image_data:
             # Use vision model for image understanding
             vision_model = "llama-3.2-11b-vision-preview"
@@ -142,12 +158,19 @@ async def chat_stream_generator(request: ChatRequest, user_id: str | None = None
                 max_tokens=1024,
             )
             full_response = response.choices[0].message.content or ""
+            
+            # Non-streaming tokens estimate
+            token_count = len(full_response)
+            
             # Send full response as tokens for streaming appearance
             for i in range(0, len(full_response), 3):
                 chunk = full_response[i:i+3]
                 escaped = chunk.replace("\\", "\\\\").replace("\n", "\\n")
                 yield f"data: {json.dumps({'type': 'token', 'content': escaped})}\n\n"
                 await asyncio.sleep(0.01)
+                
+            # Send metadata
+            yield f"data: {json.dumps({'type': 'metadata', 'model': vision_model, 'token_count': token_count})}\n\n"
         else:
             messages.append({"role": "user", "content": request.message})
 
@@ -163,10 +186,14 @@ async def chat_stream_generator(request: ChatRequest, user_id: str | None = None
                 token = chunk.choices[0].delta.content
                 if token is not None:
                     full_response += token
+                    token_count += len(token)
                     escaped_token = token.replace("\\", "\\\\").replace("\n", "\\n")
                     yield f"data: {json.dumps({'type': 'token', 'content': escaped_token})}\n\n"
                 
                 await asyncio.sleep(0.01)
+                
+            # Send metadata
+            yield f"data: {json.dumps({'type': 'metadata', 'model': request.model, 'token_count': token_count})}\n\n"
 
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
 

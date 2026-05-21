@@ -1,9 +1,9 @@
 "use client";
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { getEffectiveUserId } from "@/lib/userSession";
-import { Globe, FileText, Loader2, LogIn, Lock, Info, Users, Copy, Check, X } from "lucide-react";
+import { Globe, FileText, Loader2, LogIn, Lock, Info, Users, Copy, Check, X, Square } from "lucide-react";
 import ChatInput from "@/components/chat/ChatInput/ChatInput";
 import UserMessage from "@/components/chat/Message/UserMessage";
 import AIMessage from "@/components/chat/Message/AIMessage";
@@ -11,12 +11,21 @@ import PromptTemplates from "@/components/chat/PromptTemplates";
 import { speakText } from "@/lib/tts";
 import { canSendPrompt, recordPrompt, getRemainingPrompts, getRemainingThreads, canCreateThread } from "@/lib/freeUsage";
 
+interface MessageMetadata {
+  model?: string;
+  responseTime?: number;
+  tokenCount?: number;
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
   sources?: { type: string; label: string }[];
+  metadata?: MessageMetadata;
+  thinkingContent?: string;
+  thinkingTime?: number;
 }
 
 export default function ChatThreadPage() {
@@ -39,6 +48,9 @@ export default function ChatThreadPage() {
   const [showLimitWall, setShowLimitWall] = useState(false);
   const [remaining, setRemaining] = useState(5);
   const [prefill, setPrefill] = useState("");
+  
+  // Abort controller for stop generation
+  const abortControllerRef = useRef<AbortController | null>(null);
   
   // Share Chat state
   const [isSharePopoverOpen, setIsSharePopoverOpen] = useState(false);
@@ -65,25 +77,21 @@ export default function ChatThreadPage() {
   
   const handleStartGroupChat = async () => {
     let targetThreadId = threadId;
-    // If we're on a new chat, generate a UUID and go to it
     if (!threadId || threadId === "home" || threadId === "new") {
       targetThreadId = crypto.randomUUID();
     }
     
     setIsGeneratingLink(true);
     try {
-      // Call backend to flag thread as shared
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/threads/${targetThreadId}/share`, {
         method: "POST",
         headers: { "X-User-ID": effectiveUserId }
       });
       if (res.ok) {
-        // Use a cleaner /g/ URL format for sharing
         const link = `${window.location.origin}/share/${targetThreadId}`;
         setShareLink(link);
         setIsSharePopoverOpen(false);
         setIsLinkModalOpen(true);
-        // Navigate the user to this new generated group chat if they were on a new window
         if (targetThreadId !== threadId) {
           router.replace(`/chat/${targetThreadId}`);
         }
@@ -107,7 +115,6 @@ export default function ChatThreadPage() {
     }
   };
 
-
   // Load TTS preference
   useEffect(() => {
     const stored = localStorage.getItem("nexus_tts");
@@ -129,7 +136,6 @@ export default function ChatThreadPage() {
     setShowLimitWall(false);
     
     if (!threadId || threadId === "home") {
-      // Check if can create new threads
       if (!clerkUserId && !canCreateThread()) {
         setShowLimitWall(true);
       }
@@ -161,6 +167,51 @@ export default function ChatThreadPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, statusText]);
+
+  // ── Stop generation handler ──
+  const handleStop = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsStreaming(false);
+    setStatusText("");
+  }, []);
+
+  // ── Regenerate handler ──
+  const handleRegenerate = useCallback((messageIndex: number) => {
+    // Find the user message just before this AI message
+    const aiMsg = messages[messageIndex];
+    if (!aiMsg || aiMsg.role !== "assistant") return;
+    
+    let userContent = "";
+    for (let i = messageIndex - 1; i >= 0; i--) {
+      if (messages[i].role === "user") {
+        userContent = messages[i].content;
+        break;
+      }
+    }
+    if (!userContent) return;
+
+    // Remove the AI message and re-send
+    setMessages(prev => prev.filter((_, i) => i !== messageIndex));
+    setHistory(prev => prev.slice(0, -2)); // Remove last user+assistant pair
+    handleSend(userContent, {});
+  }, [messages]);
+
+  // ── Edit message handler ──
+  const handleEditMessage = useCallback((messageIndex: number, newContent: string) => {
+    // Remove all messages after this one and re-send
+    setMessages(prev => prev.slice(0, messageIndex));
+    setHistory(prev => {
+      // Count how many history entries correspond to messages after the edit point
+      const msgsAfterEdit = messages.length - messageIndex;
+      const pairsToRemove = Math.ceil(msgsAfterEdit / 2);
+      return prev.slice(0, prev.length - pairsToRemove * 2);
+    });
+    // Re-send with new content
+    setTimeout(() => handleSend(newContent, {}), 100);
+  }, [messages]);
 
   const handleSend = async (content: string, options: any = {}) => {
     // FREE TRIAL CHECK (skip for signed-in users)
@@ -213,7 +264,6 @@ export default function ChatThreadPage() {
         const reader = new FileReader();
         reader.onload = () => {
           const result = reader.result as string;
-          // Remove the data:image/...;base64, prefix
           resolve(result.split(",")[1] || "");
         };
         reader.readAsDataURL(imageFiles[0]);
@@ -255,6 +305,11 @@ export default function ChatThreadPage() {
 
     setIsStreaming(true);
     setStatusText("");
+    const startTime = Date.now();
+
+    // Create abort controller for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
 
     try {
       if (options.imageGen) {
@@ -268,19 +323,24 @@ export default function ChatThreadPage() {
           body: JSON.stringify({ 
             prompt: content,
             thread_id: threadId
-          })
+          }),
+          signal: abortController.signal,
         });
         const data = await res.json();
         
         if (res.status === 503) {
-          // Model is warming up
           setMessages(prev => prev.map(msg => 
             msg.id === aiId ? { ...msg, content: `⏳ ${data.error}\n\nTry sending the message again in a few seconds.` } : msg
           ));
         } else if (data.image_url) {
           const imageContent = `[NEXUS_IMAGE:${data.image_url}]\n\n*"${content}"*`;
+          const responseTime = Date.now() - startTime;
           setMessages(prev => prev.map(msg => 
-            msg.id === aiId ? { ...msg, content: imageContent } : msg
+            msg.id === aiId ? {
+              ...msg,
+              content: imageContent,
+              metadata: { model: data.model || "FLUX.1-schnell", responseTime }
+            } : msg
           ));
           setHistory(prev => [
             ...prev, 
@@ -310,12 +370,19 @@ export default function ChatThreadPage() {
             model,
             image_data: imageBase64,
           }),
+          signal: abortController.signal,
         });
 
         const reader = response.body?.getReader();
         const decoder = new TextDecoder();
         let fullResponse = "";
+        let thinkingContent = "";
+        let isInThinkingBlock = false;
+        let thinkingStartTime = 0;
+        let thinkingDuration = 0;
         let messageSources: { type: string; label: string }[] = [];
+        let tokenCount = 0;
+        let responseModel = model;
 
         if (!reader) {
           setIsStreaming(false);
@@ -338,17 +405,61 @@ export default function ChatThreadPage() {
                 
                 if (event.type === "token") {
                   const cleanToken = event.content.replace(/\\n/g, "\n");
+                  tokenCount += cleanToken.length;
+
+                  // Detect <think> tags
+                  const combined = fullResponse + cleanToken;
+                  
+                  if (combined.includes("<think>") && !isInThinkingBlock) {
+                    isInThinkingBlock = true;
+                    thinkingStartTime = Date.now();
+                    // Extract content before <think>
+                    const beforeThink = combined.split("<think>")[0];
+                    fullResponse = beforeThink;
+                    const afterTag = combined.split("<think>")[1] || "";
+                    thinkingContent += afterTag;
+                    continue;
+                  }
+                  
+                  if (isInThinkingBlock) {
+                    if (combined.includes("</think>")) {
+                      isInThinkingBlock = false;
+                      thinkingDuration = (Date.now() - thinkingStartTime) / 1000;
+                      // Extract content after </think>
+                      const parts = (thinkingContent + cleanToken).split("</think>");
+                      thinkingContent = parts[0];
+                      const afterThink = parts[1] || "";
+                      fullResponse += afterThink;
+                      
+                      // Update the message with thinking content
+                      setMessages(prev => prev.map(msg =>
+                        msg.id === aiId
+                          ? { ...msg, content: fullResponse, thinkingContent, thinkingTime: thinkingDuration }
+                          : msg
+                      ));
+                    } else {
+                      thinkingContent += cleanToken;
+                      // Update thinking indicator
+                      setStatusText("💭 Thinking...");
+                    }
+                    continue;
+                  }
+
                   fullResponse += cleanToken;
                   setMessages(prev => prev.map(msg => 
                     msg.id === aiId 
-                      ? { ...msg, content: msg.content + cleanToken }
+                      ? { ...msg, content: fullResponse, thinkingContent: thinkingContent || undefined, thinkingTime: thinkingDuration || undefined }
                       : msg
                   ));
                 } else if (event.type === "status") {
                   setStatusText(event.message);
                 } else if (event.type === "sources") {
                   messageSources = event.sources;
+                } else if (event.type === "metadata") {
+                  responseModel = event.model || model;
+                  tokenCount = event.token_count || tokenCount;
                 } else if (event.type === "done") {
+                  const responseTime = Date.now() - startTime;
                   if (messageSources.length > 0) {
                     setMessages(prev => prev.map(msg => 
                       msg.id === aiId 
@@ -356,6 +467,19 @@ export default function ChatThreadPage() {
                         : msg
                     ));
                   }
+                  // Add metadata to the message
+                  setMessages(prev => prev.map(msg =>
+                    msg.id === aiId
+                      ? {
+                          ...msg,
+                          metadata: {
+                            model: responseModel,
+                            responseTime,
+                            tokenCount: Math.round(tokenCount / 4), // rough token estimate
+                          }
+                        }
+                      : msg
+                  ));
                   setStatusText("");
                   break;
                 } else if (event.type === "error") {
@@ -372,7 +496,7 @@ export default function ChatThreadPage() {
                   fullResponse += cleanToken;
                   setMessages(prev => prev.map(msg => 
                     msg.id === aiId 
-                      ? { ...msg, content: msg.content + cleanToken }
+                      ? { ...msg, content: fullResponse }
                       : msg
                   ));
                 }
@@ -395,15 +519,25 @@ export default function ChatThreadPage() {
       }
 
     } catch (error) {
-      console.error("Error:", error);
-      setMessages(prev => prev.map(msg => 
-        msg.id === aiId 
-          ? { ...msg, content: `Error: ${error instanceof Error ? error.message : "Something went wrong"}` }
-          : msg
-      ));
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        // User stopped generation — keep what we have
+        setMessages(prev => prev.map(msg =>
+          msg.id === aiId && msg.content === ""
+            ? { ...msg, content: "_Generation stopped._" }
+            : msg
+        ));
+      } else {
+        console.error("Error:", error);
+        setMessages(prev => prev.map(msg => 
+          msg.id === aiId 
+            ? { ...msg, content: `Error: ${error instanceof Error ? error.message : "Something went wrong"}` }
+            : msg
+        ));
+      }
     } finally {
       setIsStreaming(false);
       setStatusText("");
+      abortControllerRef.current = null;
     }
   };
 
@@ -567,7 +701,7 @@ export default function ChatThreadPage() {
           }}>
             <div style={{
               width: 48, height: 48, borderRadius: 12,
-              backgroundColor: '#cf6679',
+              background: 'linear-gradient(135deg, #cf6679, #7c6cf0)',
               display: 'flex', alignItems: 'center', 
               justifyContent: 'center', marginBottom: 24
             }}>
@@ -592,15 +726,23 @@ export default function ChatThreadPage() {
           </div>
         ) : (
           <>
-            {messages.map((msg) => msg.role === "user" ? (
-              <UserMessage key={msg.id} content={msg.content} 
-                timestamp={msg.timestamp} />
+            {messages.map((msg, index) => msg.role === "user" ? (
+              <UserMessage
+                key={msg.id}
+                content={msg.content}
+                timestamp={msg.timestamp}
+                onEdit={(newContent) => handleEditMessage(index, newContent)}
+              />
             ) : (
               <div key={msg.id}>
                 <AIMessage 
                   content={msg.content} 
                   timestamp={msg.timestamp} 
                   isStreaming={isStreaming && msg.id === messages[messages.length - 1]?.id}
+                  onRegenerate={() => handleRegenerate(index)}
+                  metadata={msg.metadata}
+                  thinkingContent={msg.thinkingContent}
+                  thinkingTime={msg.thinkingTime}
                 />
                 {msg.sources && msg.sources.length > 0 && !isStreaming && (
                   <div className="max-w-[680px] mx-auto px-4 pb-2 -mt-1 ml-10">
@@ -630,6 +772,19 @@ export default function ChatThreadPage() {
               </div>
             )}
 
+            {/* Stop generating button */}
+            {isStreaming && (
+              <div className="max-w-[680px] mx-auto px-4 py-2 flex justify-center">
+                <button
+                  onClick={handleStop}
+                  className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#3a3a3a] bg-[#2a2a2a] hover:bg-[#333333] text-[13px] text-[#a0a0a0] hover:text-[#ececec] transition-all"
+                >
+                  <Square size={12} className="fill-current" />
+                  Stop generating
+                </button>
+              </div>
+            )}
+
             <div ref={bottomRef} />
           </>
         )}
@@ -638,7 +793,12 @@ export default function ChatThreadPage() {
       {/* Chat input — hidden when limit wall is showing */}
       {!showLimitWall && (
         <div style={{ flexShrink: 0, padding: '8px 0 16px' }}>
-          <ChatInput onSend={handleSend} prefill={prefill.split("__")[0]} />
+          <ChatInput 
+            onSend={handleSend} 
+            prefill={prefill.split("__")[0]}
+            isStreaming={isStreaming}
+            onStop={handleStop}
+          />
         </div>
       )}
     </div>

@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Paperclip, Globe, Mic, Wand2, ArrowUp, Plus, Image, X, FileText } from "lucide-react";
+import { Paperclip, Globe, Mic, Wand2, ArrowUp, Plus, Image, X, FileText, Square } from "lucide-react";
 import VoiceMode from "@/components/VoiceMode";
 
 interface ChatInputProps {
@@ -10,11 +10,13 @@ interface ChatInputProps {
     webSearch: boolean
     imageGen: boolean
     files: File[]
-  }) => void
-  prefill?: string
+  }) => void;
+  prefill?: string;
+  isStreaming?: boolean;
+  onStop?: () => void;
 }
 
-const ChatInput = ({ onSend, prefill }: ChatInputProps) => {
+const ChatInput = ({ onSend, prefill, isStreaming, onStop }: ChatInputProps) => {
   const [message, setMessage] = useState("");
   const [isWebSearchActive, setIsWebSearchActive] = useState(false);
   const [imageGenMode, setImageGenMode] = useState(false);
@@ -347,10 +349,25 @@ const ChatInput = ({ onSend, prefill }: ChatInputProps) => {
                 <Mic size={15} />
               </button>
 
-              {/* Dynamic: Waveform (voice agent) OR Send arrow */}
+              {/* Dynamic: Stop Button (if streaming), Waveform (voice agent), OR Send arrow */}
               <AnimatePresence mode="wait">
-                {hasText ? (
-                  /* Send Button — appears when user types */
+                {isStreaming ? (
+                  /* Stop Button */
+                  <motion.button
+                    key="stop"
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.8, opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={onStop}
+                    className="w-7 h-7 flex items-center justify-center rounded-full bg-[#cf6679] text-white cursor-pointer"
+                  >
+                    <Square size={12} className="fill-current" />
+                  </motion.button>
+                ) : hasText ? (
+                  /* Send Button */
                   <motion.button
                     key="send"
                     initial={{ scale: 0.8, opacity: 0 }}
@@ -365,7 +382,7 @@ const ChatInput = ({ onSend, prefill }: ChatInputProps) => {
                     <ArrowUp size={15} strokeWidth={2.5} />
                   </motion.button>
                 ) : (
-                  /* Voice Agent Waveform Button — opens full VoiceMode */
+                  /* Voice Agent Waveform Button */
                   <motion.button
                     key="voice"
                     initial={{ scale: 0.8, opacity: 0 }}
@@ -378,7 +395,6 @@ const ChatInput = ({ onSend, prefill }: ChatInputProps) => {
                     className="w-7 h-7 flex items-center justify-center rounded-full bg-[#333333] hover:bg-[#444444] text-[#ececec] cursor-pointer transition-colors"
                     title="Use Voice"
                   >
-                    {/* Waveform bars icon */}
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                       <rect x="1" y="5" width="2" height="6" rx="1" fill="currentColor" />
                       <rect x="5" y="3" width="2" height="10" rx="1" fill="currentColor" />

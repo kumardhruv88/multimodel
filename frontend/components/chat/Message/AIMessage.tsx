@@ -5,13 +5,29 @@ import { motion } from "framer-motion";
 import { format } from "date-fns";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Copy, Check, RefreshCw, ThumbsUp, ThumbsDown, Loader2 } from "lucide-react";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import rehypeRaw from "rehype-raw";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
+import { Copy, Check, RefreshCw, ThumbsUp, ThumbsDown, Loader2, Zap, Clock, Hash } from "lucide-react";
+import ThinkingBlock from "./ThinkingBlock";
+import MermaidBlock from "./MermaidBlock";
+
+interface MessageMetadata {
+  model?: string;
+  responseTime?: number;
+  tokenCount?: number;
+}
 
 interface AIMessageProps {
   content: string;
   timestamp: Date;
   isStreaming?: boolean;
   onRegenerate?: () => void;
+  metadata?: MessageMetadata;
+  thinkingContent?: string;
+  thinkingTime?: number;
 }
 
 function GeneratedImage({ url }: { url: string }) {
@@ -41,10 +57,10 @@ function GeneratedImage({ url }: { url: string }) {
   );
 }
 
-/* ─── Code Block with Copy Button ─── */
+/* ─── Code Block with Syntax Highlighting ─── */
 function CodeBlock({ className, children }: { className?: string; children: string }) {
   const [copied, setCopied] = useState(false);
-  const lang = className?.replace("language-", "") || "plain";
+  const lang = className?.replace("language-", "") || "";
   const code = String(children).replace(/\n$/, "");
 
   const handleCopy = () => {
@@ -53,11 +69,28 @@ function CodeBlock({ className, children }: { className?: string; children: stri
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Mermaid diagrams get their own renderer
+  if (lang === "mermaid") {
+    return <MermaidBlock code={code} />;
+  }
+
+  const lineCount = code.split("\n").length;
+  const showLineNumbers = lineCount > 4;
+
   return (
     <div className="group relative rounded-xl border border-[#2a2a3a] bg-[#1e1e2e] mb-4 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-[#2a2a3a] bg-[#1e1e2e]">
-        <span className="text-[11px] text-[#6b6b6b] uppercase tracking-wider font-medium">{lang}</span>
+      <div className="flex items-center justify-between px-4 py-2 border-b border-[#2a2a3a] bg-[#1a1a2a]">
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1.5">
+            <div className="w-[10px] h-[10px] rounded-full bg-[#ff5f57]/70" />
+            <div className="w-[10px] h-[10px] rounded-full bg-[#febc2e]/70" />
+            <div className="w-[10px] h-[10px] rounded-full bg-[#28c840]/70" />
+          </div>
+          <span className="text-[11px] text-[#6b6b6b] uppercase tracking-wider font-medium ml-2">
+            {lang || "code"}
+          </span>
+        </div>
         <button
           onClick={handleCopy}
           className="flex items-center gap-1.5 text-[11px] text-[#6b6b6b] hover:text-[#ececec] transition-colors"
@@ -75,15 +108,45 @@ function CodeBlock({ className, children }: { className?: string; children: stri
           )}
         </button>
       </div>
-      {/* Code content */}
-      <pre className="p-4 overflow-x-auto">
-        <code className="text-[13px] font-mono text-[#ececec] leading-6">{code}</code>
-      </pre>
+      {/* Syntax-highlighted code */}
+      <SyntaxHighlighter
+        language={lang || "text"}
+        style={oneDark}
+        showLineNumbers={showLineNumbers}
+        wrapLines
+        customStyle={{
+          margin: 0,
+          padding: "16px",
+          background: "transparent",
+          fontSize: "13px",
+          lineHeight: "1.7",
+        }}
+        lineNumberStyle={{
+          minWidth: "2.5em",
+          paddingRight: "1em",
+          color: "#4a4a5a",
+          fontSize: "11px",
+          userSelect: "none",
+        }}
+        codeTagProps={{
+          style: { fontFamily: "var(--font-jetbrains-mono, 'JetBrains Mono'), 'Fira Code', monospace" }
+        }}
+      >
+        {code}
+      </SyntaxHighlighter>
     </div>
   );
 }
 
-const AIMessage: React.FC<AIMessageProps> = ({ content, timestamp, isStreaming, onRegenerate }) => {
+const AIMessage: React.FC<AIMessageProps> = ({
+  content,
+  timestamp,
+  isStreaming,
+  onRegenerate,
+  metadata,
+  thinkingContent,
+  thinkingTime,
+}) => {
   const [msgCopied, setMsgCopied] = useState(false);
 
   const handleCopyMessage = () => {
@@ -101,6 +164,15 @@ const AIMessage: React.FC<AIMessageProps> = ({ content, timestamp, isStreaming, 
   }
   const textContent = content.replace(/\[NEXUS_IMAGE:.*?\]\n*/g, "").trim();
 
+  // Format metadata display
+  const metaModel = metadata?.model?.replace("llama-", "LLaMA ").replace("-versatile", "") || "";
+  const metaTime = metadata?.responseTime
+    ? metadata.responseTime >= 1000
+      ? `${(metadata.responseTime / 1000).toFixed(1)}s`
+      : `${Math.round(metadata.responseTime)}ms`
+    : "";
+  const metaTokens = metadata?.tokenCount ? `${metadata.tokenCount} tokens` : "";
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -109,20 +181,26 @@ const AIMessage: React.FC<AIMessageProps> = ({ content, timestamp, isStreaming, 
       className="group flex gap-3 px-4 py-3 max-w-[680px] mx-auto w-full"
     >
       {/* LEFT: Avatar */}
-      <div className="w-7 h-7 shrink-0 rounded-full bg-[#cf6679] flex items-center justify-center mt-1">
+      <div className="w-7 h-7 shrink-0 rounded-full bg-gradient-to-br from-[#cf6679] to-[#7c6cf0] flex items-center justify-center mt-1">
         <span className="text-white text-[11px] font-bold">N</span>
       </div>
 
       {/* RIGHT: Content & Actions */}
       <div className="flex flex-col gap-1 flex-1 min-w-0">
-        {/* Render extracted images directly */}
+        {/* Thinking block */}
+        {thinkingContent && (
+          <ThinkingBlock content={thinkingContent} thinkingTime={thinkingTime} />
+        )}
+
+        {/* Render extracted images */}
         {imageUrls.map((url, i) => (
           <GeneratedImage key={i} url={url} />
         ))}
 
         <div className="prose prose-invert max-w-none">
           <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
+            remarkPlugins={[remarkGfm, remarkMath]}
+            rehypePlugins={[rehypeKatex, rehypeRaw]}
             components={{
               p: ({ children }) => (
                 <p className="text-[14px] text-[#ececec] leading-7 mb-3">
@@ -147,6 +225,9 @@ const AIMessage: React.FC<AIMessageProps> = ({ content, timestamp, isStreaming, 
               h3: ({ children }) => (
                 <h3 className="text-[17px] font-semibold text-[#ececec] mb-2 mt-5">{children}</h3>
               ),
+              h4: ({ children }) => (
+                <h4 className="text-[15px] font-semibold text-[#d0d0d0] mb-2 mt-4">{children}</h4>
+              ),
               ul: ({ children }) => (
                 <ul className="list-disc ml-5 mb-3 space-y-1 text-[14px] text-[#ececec]">
                   {children}
@@ -165,15 +246,18 @@ const AIMessage: React.FC<AIMessageProps> = ({ content, timestamp, isStreaming, 
                   href={href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[#4a9eff] hover:underline"
+                  className="text-[#4a9eff] hover:text-[#6bb3ff] hover:underline underline-offset-2 transition-colors"
                 >
                   {children}
                 </a>
               ),
               blockquote: ({ children }) => (
-                <blockquote className="border-l-[3px] border-[#cf6679] pl-4 my-3 text-[#a0a0a0] italic">
+                <blockquote className="border-l-[3px] border-[#cf6679] pl-4 my-3 text-[#a0a0a0] italic bg-[#cf6679]/5 py-2 rounded-r-lg">
                   {children}
                 </blockquote>
+              ),
+              hr: () => (
+                <hr className="border-[#3a3a3a] my-6" />
               ),
               img: ({ src, alt }) => (
                 <img
@@ -184,18 +268,21 @@ const AIMessage: React.FC<AIMessageProps> = ({ content, timestamp, isStreaming, 
                 />
               ),
               table: ({ children }) => (
-                <div className="overflow-x-auto mb-4">
+                <div className="overflow-x-auto mb-4 rounded-lg border border-[#2a2a3a]">
                   <table className="w-full border-collapse text-[13px]">{children}</table>
                 </div>
               ),
               thead: ({ children }) => (
-                <thead className="bg-[#2a2a2a]">{children}</thead>
+                <thead className="bg-[#1e1e2e]">{children}</thead>
               ),
               th: ({ children }) => (
-                <th className="border border-[#3a3a3a] px-3 py-2 text-left text-[#ececec] font-semibold">{children}</th>
+                <th className="border-b border-[#2a2a3a] px-4 py-2.5 text-left text-[#ececec] font-semibold text-[12px] uppercase tracking-wider">{children}</th>
               ),
               td: ({ children }) => (
-                <td className="border border-[#3a3a3a] px-3 py-2 text-[#ececec]">{children}</td>
+                <td className="border-b border-[#2a2a3a]/50 px-4 py-2.5 text-[#d0d0d0]">{children}</td>
+              ),
+              tr: ({ children }) => (
+                <tr className="hover:bg-[#2a2a2a]/30 transition-colors">{children}</tr>
               ),
               code: ({ className, children, ...props }) => {
                 const isBlock = className?.includes("language-");
@@ -204,7 +291,7 @@ const AIMessage: React.FC<AIMessageProps> = ({ content, timestamp, isStreaming, 
                 }
                 return (
                   <code
-                    className="bg-[#2a2a2a] border border-[#3a3a3a] rounded px-1.5 py-0.5 text-[#cf6679] text-[13px] font-mono"
+                    className="bg-[#2a2a2a] border border-[#3a3a3a] rounded-md px-1.5 py-0.5 text-[#e06c8a] text-[13px] font-mono"
                     {...props}
                   >
                     {children}
@@ -218,12 +305,37 @@ const AIMessage: React.FC<AIMessageProps> = ({ content, timestamp, isStreaming, 
           </ReactMarkdown>
         </div>
 
-        {/* Message Actions & Timestamp */}
+        {/* Message Actions & Metadata */}
         {!isStreaming && (
-          <div className="flex items-center gap-1 mt-1 ml-1">
+          <div className="flex items-center gap-1 mt-1 ml-1 flex-wrap">
             <span className="text-[11px] text-[#6b6b6b] mr-2">
               {format(timestamp, "h:mm a")}
             </span>
+
+            {/* Metadata badges */}
+            {metadata && (metaModel || metaTime || metaTokens) && (
+              <div className="flex items-center gap-2 mr-2">
+                {metaModel && (
+                  <span className="flex items-center gap-1 text-[10px] text-[#5a5a6a]">
+                    <Zap size={9} className="text-[#cf6679]" />
+                    {metaModel}
+                  </span>
+                )}
+                {metaTime && (
+                  <span className="flex items-center gap-1 text-[10px] text-[#5a5a6a]">
+                    <Clock size={9} />
+                    {metaTime}
+                  </span>
+                )}
+                {metaTokens && (
+                  <span className="flex items-center gap-1 text-[10px] text-[#5a5a6a]">
+                    <Hash size={9} />
+                    {metaTokens}
+                  </span>
+                )}
+              </div>
+            )}
+
             <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
                 onClick={handleCopyMessage}
