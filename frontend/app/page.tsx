@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import dynamic from "next/dynamic";
 import {
   Search,
   FileText,
@@ -95,6 +96,11 @@ const fadeUp = {
   }),
 };
 
+const HeroBackground3D = dynamic(
+  () => import("@/components/ui/hero-background-3d"),
+  { ssr: false }
+);
+
 export default function LandingPage() {
   const router = useRouter();
   return (
@@ -114,10 +120,7 @@ export default function LandingPage() {
           <span className="text-white font-semibold text-[15px] tracking-tight">NEXUS AI</span>
         </a>
 
-        <div className="hidden md:flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-purple-500/[0.08] border border-purple-500/20 text-purple-400 text-xs">
-          <Zap size={12} />
-          Powered by Groq · Llama 3.3 70B
-        </div>
+
 
         <div className="flex items-center gap-2">
           <button
@@ -138,29 +141,51 @@ export default function LandingPage() {
       {/* ===== HERO ===== */}
       <section className="relative min-h-screen flex flex-col items-center justify-center pt-16 px-6 overflow-hidden">
         {/* Background effects */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_40%,rgba(224,90,122,0.08),transparent_60%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_30%_60%,rgba(168,85,247,0.05),transparent_50%)]" />
+        <HeroBackground3D />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_40%,rgba(224,90,122,0.08),transparent_60%)] pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_30%_60%,rgba(168,85,247,0.05),transparent_50%)] pointer-events-none" />
+
+        {/* Canvas Edge Blending Overlays for smooth scroll transitions */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_35%,#0d0d0d_95%)] pointer-events-none z-1" />
+        <div className="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-t from-[#0d0d0d] via-[#0d0d0d]/70 to-transparent pointer-events-none z-1" />
 
         <motion.div
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-          className="relative z-10 text-center max-w-3xl"
+          className="relative z-10 text-center max-w-4xl"
         >
-          <h1 className="text-[clamp(40px,6vw,72px)] font-bold leading-[1.1] tracking-tight">
-            Think Deeper.
-            <br />
-            Create Faster.
-            <br />
-            <span className="bg-gradient-to-r from-[#e05a7a] to-[#a855f7] bg-clip-text text-transparent">
-              Know More.
-            </span>
+          <h1 className="text-[clamp(24px,4.2vw,48px)] font-bold leading-tight tracking-tight flex flex-wrap justify-center gap-x-3 md:gap-x-5">
+            <motion.span
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+              className="text-white"
+            >
+              Think Deeper
+            </motion.span>
+            <motion.span
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.8, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+              className="text-white"
+            >
+              Create Faster
+            </motion.span>
+            <motion.span
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.4, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+              className="bg-gradient-to-r from-[#e05a7a] to-[#a855f7] bg-clip-text text-transparent"
+            >
+              Know More
+            </motion.span>
           </h1>
 
           <motion.p
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.6 }}
+            transition={{ delay: 1.9, duration: 0.6 }}
             className="mt-6 text-[#888] text-base md:text-lg leading-relaxed max-w-xl mx-auto"
           >
             An AI that searches the web, understands your documents, and
@@ -168,30 +193,37 @@ export default function LandingPage() {
           </motion.p>
 
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5, duration: 0.6 }}
-            className="mt-8 flex flex-col items-center gap-3"
+            transition={{ delay: 2.2, duration: 0.6 }}
+            className="mt-10 flex flex-col items-center"
           >
             <button
-              onClick={() => router.push("/chat/new")}
-              className="group px-8 py-3.5 bg-[#e05a7a] hover:bg-[#c9506c] text-white font-semibold rounded-full text-base flex items-center gap-2 transition-all hover:shadow-xl hover:shadow-[#e05a7a]/25 hover:-translate-y-0.5"
+              onClick={() => {
+                document.getElementById("features")?.scrollIntoView({ behavior: "smooth" });
+              }}
+              className="group flex flex-col items-center gap-2.5 text-xs font-semibold tracking-widest text-[#888] hover:text-white uppercase transition-colors pointer-events-auto"
             >
-              Start for Free
-              <ArrowRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
+              <span>Scroll to Explore</span>
+              <motion.div
+                animate={{ y: [0, 5, 0] }}
+                transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+              >
+                <ArrowRight size={15} className="rotate-90 text-[#e05a7a]" />
+              </motion.div>
             </button>
-            <span className="text-xs text-[#555]">
-              5 free chats · No sign-up required
-            </span>
           </motion.div>
         </motion.div>
+      </section>
 
-        {/* Chat preview mockup */}
+      {/* ===== CHAT MOCKUP CONTAINER ===== */}
+      <section className="relative z-10 px-6 flex justify-center -mt-20 md:-mt-28 pb-16">
         <motion.div
-          initial={{ opacity: 0, y: 60 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-          className="relative z-10 mt-16 w-full max-w-2xl"
+          initial={{ opacity: 0, y: 50 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-60px" }}
+          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+          className="w-full max-w-2xl"
         >
           <div className="bg-[#1a1a1a] border border-white/[0.08] rounded-2xl p-5 shadow-2xl shadow-black/40">
             <div className="flex items-center gap-2 mb-4">
@@ -265,7 +297,7 @@ export default function LandingPage() {
       </section>
 
       {/* ===== HOW IT WORKS ===== */}
-      <section className="py-24 px-6 bg-[#111]" id="how">
+      <section className="py-24 px-6 bg-gradient-to-b from-[#0d0d0d] via-[#111111] to-[#0d0d0d]" id="how">
         <div className="max-w-2xl mx-auto">
           <motion.h2
             variants={fadeUp}
@@ -333,20 +365,63 @@ export default function LandingPage() {
       </section>
 
       {/* ===== FOOTER ===== */}
-      <footer className="flex items-center justify-between px-6 md:px-10 py-5 border-t border-white/[0.06]">
-        <div className="flex items-center gap-3">
-          <div className="w-6 h-6 rounded-md bg-gradient-to-br from-[#e05a7a] to-[#a855f7] flex items-center justify-center">
-            <span className="text-white text-[10px] font-bold">N</span>
+      <footer className="relative bg-[#080808] border-t border-white/[0.04] pt-16 pb-8 px-6 md:px-10 z-10">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8 mb-12 text-left">
+          {/* Brand Info */}
+          <div className="md:col-span-1 space-y-4">
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#e05a7a] to-[#a855f7] flex items-center justify-center">
+                <span className="text-white text-xs font-bold">N</span>
+              </div>
+              <span className="text-white font-semibold text-sm tracking-tight">NEXUS AI</span>
+            </div>
+            <p className="text-xs text-[#666] leading-relaxed">
+              Think deeper, create faster, and know more with the ultimate AI-powered workspace. Powered by cutting-edge intelligence.
+            </p>
           </div>
-          <span className="text-[#555] text-xs">© 2026 NEXUS AI. All rights reserved.</span>
+
+          {/* Columns */}
+          <div>
+            <h4 className="text-xs font-semibold text-white uppercase tracking-wider mb-4">Product</h4>
+            <ul className="space-y-2 text-xs text-[#666]">
+              <li><a href="#features" className="hover:text-white transition-colors">Features</a></li>
+              <li><a href="/chat/new" className="hover:text-white transition-colors">Try Free</a></li>
+              <li><a href="#" className="hover:text-white transition-colors">Pricing</a></li>
+              <li><a href="#" className="hover:text-white transition-colors">Releases</a></li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-semibold text-white uppercase tracking-wider mb-4">Company</h4>
+            <ul className="space-y-2 text-xs text-[#666]">
+              <li><a href="#" className="hover:text-white transition-colors">About Us</a></li>
+              <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
+              <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
+              <li><a href="mailto:hello@nexus-ai.com" className="hover:text-white transition-colors">Contact</a></li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-semibold text-white uppercase tracking-wider mb-4">Legal</h4>
+            <ul className="space-y-2 text-xs text-[#666]">
+              <li><a href="#" className="hover:text-white transition-colors">Privacy Policy</a></li>
+              <li><a href="#" className="hover:text-white transition-colors">Terms of Service</a></li>
+              <li><a href="#" className="hover:text-white transition-colors">Security</a></li>
+            </ul>
+          </div>
         </div>
-        <div className="flex items-center gap-4">
-          <a href="https://github.com" target="_blank" rel="noreferrer" className="text-[#555] hover:text-[#888] transition-colors">
-            <Github size={16} />
-          </a>
-          <a href="mailto:hello@nexus-ai.com" className="text-[#555] hover:text-[#888] transition-colors">
-            <Mail size={16} />
-          </a>
+
+        {/* Bottom copyright & socials */}
+        <div className="max-w-6xl mx-auto pt-8 border-t border-white/[0.04] flex flex-col md:flex-row items-center justify-between gap-4">
+          <span className="text-[#555] text-xs">© {new Date().getFullYear()} NEXUS AI. All rights reserved.</span>
+          <div className="flex items-center gap-4">
+            <a href="https://github.com" target="_blank" rel="noreferrer" className="w-8 h-8 rounded-full bg-white/[0.02] border border-white/[0.06] flex items-center justify-center text-[#555] hover:text-white hover:border-white/20 transition-all">
+              <Github size={14} />
+            </a>
+            <a href="mailto:hello@nexus-ai.com" className="w-8 h-8 rounded-full bg-white/[0.02] border border-white/[0.06] flex items-center justify-center text-[#555] hover:text-white hover:border-white/20 transition-all">
+              <Mail size={14} />
+            </a>
+          </div>
         </div>
       </footer>
         </motion.div>

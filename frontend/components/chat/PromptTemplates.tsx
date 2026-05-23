@@ -4,7 +4,7 @@ import React from "react";
 import { Code, FileText, Lightbulb, PenTool, Search, Zap } from "lucide-react";
 
 interface PromptTemplate {
-  icon: React.ElementType;
+  icon: React.ComponentType<any>;
   label: string;
   prompt: string;
   color: string;
